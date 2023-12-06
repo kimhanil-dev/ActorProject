@@ -9,34 +9,45 @@
 
 #include <CoreMinimal.h>
 
-// plugin headers
-#include "../MovellaXsensDotPublicHeader.h"
-
 #define LOCTEXT_NAMESPACE "FMovellaXsensDotModule"
 
 void FMovellaXsensDotModule::StartupModule()
 {
-	// 1. ConnectionManager 생성
-	mXsDotConnectionManager = XsDotConnectionManager::construct();
+	FString dllName = TEXT("movelladot_pc_sdk64.dll");
 
-	// 2. CallBack 등록
-	mXsDotCallBack = new FMovellaXsesnDotCallBack();
-	mXsDotConnectionManager->addXsDotCallbackHandler(mXsDotCallBack);
+	DLLHandle = FPlatformProcess::GetDllHandle(*dllName);
+	if (DLLHandle == nullptr)
+	{
+		FString errorAdvice;
+		DWORD errorCode = GetLastError();
+		switch (errorCode)
+		{
+		case ERROR_FILE_NOT_FOUND:
+		{
+			errorAdvice = TEXT("Make sure the DLL is in these directories. \n\n");
+
+			TArray<FString> dllDirectories;
+			FPlatformProcess::GetDllDirectories(dllDirectories);
+			for (const FString& directory : dllDirectories)
+			{
+				errorAdvice += directory + '\n';
+			}
+		}
+			break;
+		default:
+			break;
+		}
+
+		FMessageDialog::Open(EAppMsgCategory::Error,EAppMsgType::Type::Ok, FText::FromString(FString::Printf(TEXT("DLL load failed : %s (error : %d) \n %s"), *dllName,errorCode, *errorAdvice)));
+
+		assert(true);
+	}
 }
 
 void FMovellaXsensDotModule::ShutdownModule()
 {
-	if (mXsDotConnectionManager != nullptr)
-	{
-		mXsDotConnectionManager->destruct();
-		mXsDotConnectionManager = nullptr;
-	}
-
-	if (mXsDotCallBack != nullptr)
-	{
-		delete mXsDotCallBack;
-		mXsDotCallBack = nullptr;
-	}
+	if(DLLHandle != nullptr)
+		FPlatformProcess::FreeDllHandle(DLLHandle);
 }
 
 #undef LOCTEXT_NAMESPACE
