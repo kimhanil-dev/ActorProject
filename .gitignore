@@ -97,4 +97,6 @@ Plugins/**/Intermediate/*
 
 #--------------------------------------------------------------------
 # 김한일이 추가
-*/Textures/*
+Content/**/Textures/*
+Content/**/Meshs/*
+Content/**/Audio/*
