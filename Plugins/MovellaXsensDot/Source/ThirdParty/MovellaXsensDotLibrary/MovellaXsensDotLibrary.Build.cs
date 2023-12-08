@@ -17,9 +17,10 @@ public class MovellaXsensDotLibrary : ModuleRules
 
             // Add the import library
             PublicAdditionalLibraries.Add(Path.Combine(ModuleDirectory, "x64", "lib", "movelladot_pc_sdk64.lib"));
+            PublicAdditionalLibraries.Add(Path.Combine(ModuleDirectory, "x64", "lib", "xstypes64.lib"));
 
             // Ensure that the DLL is staged along with the executable
-            RuntimeDependencies.Add("$(PluginDir)/Binaries/ThirdParty/XsDotLibrary/Win64/movelladot_pc_sdk64.dll");
+            RuntimeDependencies.Add("$(PluginDir)/Binaries/ThirdParty/MovellaXsensDotLibrary/Win64/movelladot_pc_sdk64.dll");
         }
 	}
 }

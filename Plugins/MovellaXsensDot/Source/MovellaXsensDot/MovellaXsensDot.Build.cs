@@ -1,5 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+using Microsoft.CodeAnalysis;
 using System.IO;
 using UnrealBuildTool;
 
@@ -22,17 +23,14 @@ public class MovellaXsensDot : ModuleRules
 			}
 			);
 			
-		
 		PublicDependencyModuleNames.AddRange(
-			new string[]
-			{
-				"Core",
-                "MovellaXsensDotLibrary",
-				"Projects"
-				// ... add other public dependencies that you statically link with here ...
+			new string[] { 
+				"Core", 
+				"CoreUObject", 
+				"Engine", 
+				"MovellaXsensDotLibrary"
 			}
 			);
-			
 		
 		PrivateDependencyModuleNames.AddRange(
 			new string[]

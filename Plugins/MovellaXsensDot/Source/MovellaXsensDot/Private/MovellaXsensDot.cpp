@@ -6,6 +6,7 @@
 #include "Interfaces/IPluginManager.h"
 #include "Misc/Paths.h"
 #include "HAL/PlatformProcess.h"
+#include "Windows/WindowsHWrapper.h"
 
 #include <CoreMinimal.h>
 
@@ -13,10 +14,10 @@
 
 void FMovellaXsensDotModule::StartupModule()
 {
-	FString dllName = TEXT("movelladot_pc_sdk64.dll");
-
-	DLLHandle = FPlatformProcess::GetDllHandle(*dllName);
-	if (DLLHandle == nullptr)
+	
+	xstypeDLLHandle = FPlatformProcess::GetDllHandle(TEXT("xstypes64.dll"));
+	xsDotDLLHandle = FPlatformProcess::GetDllHandle(TEXT("movelladot_pc_sdk64.dll"));
+	if (xsDotDLLHandle == nullptr)
 	{
 		FString errorAdvice;
 		DWORD errorCode = GetLastError();
@@ -38,16 +39,17 @@ void FMovellaXsensDotModule::StartupModule()
 			break;
 		}
 
-		FMessageDialog::Open(EAppMsgCategory::Error,EAppMsgType::Type::Ok, FText::FromString(FString::Printf(TEXT("DLL load failed : %s (error : %d) \n %s"), *dllName,errorCode, *errorAdvice)));
-
-		assert(true);
+		FMessageDialog::Open(EAppMsgCategory::Error,EAppMsgType::Type::Ok, FText::FromString(FString::Printf(TEXT("DLL load failed : %s (error : %d) \n %s"), "movelladot_pc_sdk64.dll",errorCode, *errorAdvice)));
 	}
 }
 
 void FMovellaXsensDotModule::ShutdownModule()
 {
-	if(DLLHandle != nullptr)
-		FPlatformProcess::FreeDllHandle(DLLHandle);
+	if(xsDotDLLHandle != nullptr)
+		FPlatformProcess::FreeDllHandle(xsDotDLLHandle);
+
+	if (xstypeDLLHandle != nullptr)
+		FPlatformProcess::FreeDllHandle(xstypeDLLHandle);
 }
 
 #undef LOCTEXT_NAMESPACE
