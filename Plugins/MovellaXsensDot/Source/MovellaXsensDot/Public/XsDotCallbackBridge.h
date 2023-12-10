@@ -33,6 +33,22 @@ struct FXsPortInfo
 	FString BluetoothAddress;
 };
 
+UENUM(BlueprintType)
+enum class EOutputRate : uint8
+{
+	OR_NONE = 0 UMETA(DisplayName = "None"),
+
+	OR_1HZ = 1 UMETA(DisplayName = "OutputRate 1Hz"),
+	OR_4HZ = 4 UMETA(DisplayName = "OutputRate 4Hz"),
+	OR_10HZ = 10 UMETA(DisplayName = "OutputRate 10Hz"),
+	OR_12HZ = 12 UMETA(DisplayName = "OutputRate 12Hz"),
+	OR_15HZ = 15 UMETA(DisplayName = "OutputRate 15Hz"),
+	OR_20HZ = 20 UMETA(DisplayName = "OutputRate 20Hz"),
+	OR_30HZ = 30 UMETA(DisplayName = "OutputRate 30Hz"),
+	OR_60HZ = 60 UMETA(DisplayName = "OutputRate 60Hz"),
+	OR_120HZ = 120 UMETA(DisplayName = "OutputRate 120Hz")
+};
+
 class IXsDotCallBackListener
 {
 public:
@@ -60,11 +76,11 @@ public:
 	// usb device detection
 	XsPortInfoArray DetectUsbDevices();
 
-	bool ConnectDot(XsPortInfo& portInfo);
+	bool ConnectDot(XsPortInfo portInfo);
 	//todo : connection에 실패했을 경우에 어떻게 알릴 것인지?
-	void ConnectDots(XsPortInfoArray& portInfos);
+	bool ConnectDots(const XsPortInfoArray& portInfos);
 	//todo : connection에 실패했을 경우에 어떻게 알릴 것인지?
-	void ConnectAllDots();
+	bool ConnectAllDots();
 
 	XsPortInfoArray GetDetectedDevices();
 	TArray<const XsDotDevice*> GetConnectedDevices();
@@ -72,6 +88,8 @@ public:
 	// packet에서 데이터를 추출하는 함수로
 	// 데이터가 없거나 추출에 실패하면 false를 리턴함
 	bool GetLiveData(const FString& deviceBluetoothAddress, FVector& outRotation, FVector& outAcc);
+
+	void SetLiveDataOutputRate(const EOutputRate& rate = EOutputRate::OR_30HZ);
 
 	void Cleanup();
 

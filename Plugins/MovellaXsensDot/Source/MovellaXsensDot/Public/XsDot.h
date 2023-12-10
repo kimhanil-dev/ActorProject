@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Engine/LatentActionManager.h"
+#include "LatentActions.h"
 
 #include "XsDotCallbackBridge.h"
 
@@ -19,23 +21,31 @@ public:
 	UXsDot();
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	void StartScanning();
-
-	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	void StopScanning();
-
-	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	void ConnectDevices();
-
-	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void GetDetectedDeviceName(TArray<FXsPortInfo>& devices);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void GetLiveData(const FString deviceBluetoothAddress, FVector& rotation, FVector& acceleration, bool& valid);
+
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	void SetLiveDataOutputRate(const EOutputRate& rate);
+
+	DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnDeviceConnectionTryFinished, FString, deviceAddress, bool, isSuccess);
+	FOnDeviceConnectionTryFinished OnDeviceConnectionTryFinished;
 	
-	/*DECLARE_DELEGATE_OneParam(FOnDeviceDetected, const FXsPortInfo&)
-	UPROPERTY(BlueprintAssignable, Category = "Xsens Dot")
-	FOnDeviceDetected OnDeviceDetected;*/
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	void ConnectDevices();
+
+
+	DECLARE_DYNAMIC_DELEGATE_OneParam(FOnDeviceDetected, FString, deviceAddress);
+	FOnDeviceDetected OnDeviceDetected;
+	
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	void StartScanning();
+
+
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	void StopScanning();
+
 
 protected:
 	// Called when the game starts
@@ -46,9 +56,21 @@ public:
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 private:
-	TUniquePtr<XsDotCallbackBridge> XsDotHelper;
+	XsDotCallbackBridge* XsDotHelper = nullptr;
 
 	// Inherited via IXsDotCallBackListener
 	void OnAdvertisementFound(const FXsPortInfo& portInfo) override;
 	void OnError(const XsResultValue result, const FString error) override;
+};
+
+
+class FAsyncConnectDevices : public FNonAbandonableTask
+{
+public:
+	FAsyncConnectDevices(XsDotCallbackBridge& xsDotHelper) : XsDotHelper(xsDotHelper) {}
+	FORCEINLINE TStatId GetStatId() const { RETURN_QUICK_DECLARE_CYCLE_STAT(FAsyncConnectDevices, STATGROUP_ThreadPoolAsyncTasks); }
+
+	XsDotCallbackBridge& XsDotHelper;
+
+	void DoWork();
 };

@@ -39,7 +39,7 @@ void FMovellaXsensDotModule::StartupModule()
 			break;
 		}
 
-		FMessageDialog::Open(EAppMsgCategory::Error,EAppMsgType::Type::Ok, FText::FromString(FString::Printf(TEXT("DLL load failed : %s (error : %d) \n %s"), "movelladot_pc_sdk64.dll",errorCode, *errorAdvice)));
+		FMessageDialog::Open(EAppMsgType::Type::Ok, FText::FromString(FString::Printf(TEXT("DLL load failed : %s (error : %d) \n %s"), "movelladot_pc_sdk64.dll",errorCode, *errorAdvice)));
 	}
 }
 

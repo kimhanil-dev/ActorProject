@@ -53,7 +53,7 @@ XsPortInfoArray XsDotCallbackBridge::DetectUsbDevices()
 	return mConnectionManager->detectUsbDevices();
 }
 
-bool XsDotCallbackBridge::ConnectDot(XsPortInfo& portInfo)
+bool XsDotCallbackBridge::ConnectDot(XsPortInfo portInfo)
 {
 	if (portInfo.isBluetooth())
 	{
@@ -130,20 +130,21 @@ bool XsDotCallbackBridge::ConnectDot(XsPortInfo& portInfo)
 	return true;
 }
 
-void XsDotCallbackBridge::ConnectDots(XsPortInfoArray& portInfos)
+bool XsDotCallbackBridge::ConnectDots(const XsPortInfoArray& portInfos)
 {
-	for (XsPortInfo& portInfo : portInfos)
+	bool result = true;
+	for (const XsPortInfo& portInfo : portInfos)
 	{
-		ConnectDot(portInfo);
+		if(!ConnectDot(portInfo))
+			result = false;
 	}
+
+	return result;
 }
 
-void XsDotCallbackBridge::ConnectAllDots()
+bool XsDotCallbackBridge::ConnectAllDots()
 {
-	for (XsPortInfo& portInfo : GetDetectedDevices())
-	{
-		ConnectDot(portInfo);
-	}
+	return ConnectDots(GetDetectedDevices());
 }
 
 XsPortInfoArray XsDotCallbackBridge::GetDetectedDevices()
@@ -166,9 +167,6 @@ TArray<const XsDotDevice*> XsDotCallbackBridge::GetConnectedDevices()
 bool XsDotCallbackBridge::GetLiveData(const FString& deviceBluetoothAddress, FVector& outRotation, FVector& outAcc)
 {
 	xsens::Lock locky(&mMutex);
-
-	if(!mPackets.contains(deviceBluetoothAddress))
-		return false;
 
 	auto& packets = mPackets[deviceBluetoothAddress];
 	if(packets.size() == 0)
@@ -200,6 +198,14 @@ bool XsDotCallbackBridge::GetLiveData(const FString& deviceBluetoothAddress, FVe
 	}
 
 	return true;
+}
+
+void XsDotCallbackBridge::SetLiveDataOutputRate(const EOutputRate& rate)
+{
+	for (auto* device : mConnectedDevices)
+	{
+		device->setOutputRate(static_cast<uint8>(rate));
+	}
 }
 
 void XsDotCallbackBridge::onAdvertisementFound(const XsPortInfo* portInfo)

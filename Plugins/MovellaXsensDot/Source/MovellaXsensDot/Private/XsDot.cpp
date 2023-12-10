@@ -14,7 +14,7 @@ UXsDot::UXsDot()
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
 
-	XsDotHelper = TUniquePtr<XsDotCallbackBridge>(new XsDotCallbackBridge());
+	XsDotHelper = new XsDotCallbackBridge();
 	XsDotHelper->Initialize();
 	XsDotHelper->RegisterListener(this);
 }
@@ -23,6 +23,7 @@ UXsDot::UXsDot()
 
 void UXsDot::StartScanning()
 {
+	OnDeviceDetected = onDeviceDetected;
 	XsDotHelper->StartScanning();
 }
 
@@ -33,7 +34,17 @@ void UXsDot::StopScanning()
 
 void UXsDot::ConnectDevices()
 {
-	XsDotHelper->ConnectAllDots();
+	OnDeviceConnectionTryFinished = onDeviceConnectionResult;
+
+	UE_LOG(XsDot,Log,TEXT("ConnectDevices function called"));
+
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [&]()
+	{
+		auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper);
+		deviceConnector->StartBackgroundTask();
+		deviceConnector->EnsureCompletion();
+		delete deviceConnector;
+	});
 }
 
 #pragma endregion UFUNCTIONs
@@ -52,6 +63,11 @@ void UXsDot::GetLiveData(const FString deviceBluetoothAddress, FVector& rotation
 	valid = XsDotHelper->GetLiveData(deviceBluetoothAddress, rotation, acceleration);
 }
 
+void UXsDot::SetLiveDataOutputRate(const EOutputRate& rate)
+{
+	XsDotHelper->SetLiveDataOutputRate(rate);
+}
+
 #pragma region UE Events
 
 // Called when the game starts
@@ -65,7 +81,12 @@ void UXsDot::BeginPlay()
 void UXsDot::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
-	XsDotHelper->Cleanup();
+
+	if (XsDotHelper != nullptr)
+	{
+		XsDotHelper->Cleanup();
+		delete XsDotHelper;
+	}
 }
 
 // Called every frame
@@ -83,6 +104,7 @@ void UXsDot::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponent
 
 void UXsDot::OnAdvertisementFound(const FXsPortInfo& portInfo)
 {
+	//OnDeviceDetected.Execute(portInfo.BluetoothAddress);
 }
 
 void UXsDot::OnError(const XsResultValue result, const FString error)
@@ -90,3 +112,11 @@ void UXsDot::OnError(const XsResultValue result, const FString error)
 }
 
 #pragma endregion IXsDotCallbackListener
+
+void FAsyncConnectDevices::DoWork()
+{
+	for(auto& device : XsDotHelper.GetDetectedDevices())
+	{
+		bool result = XsDotHelper.ConnectDot(device);
+	}
+}
