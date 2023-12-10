@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "5.3",
+	"EngineAssociation": "5.1",
 	"Category": "",
 	"Description": "",
 	"Modules": [
@@ -19,9 +19,23 @@
 			]
 		},
 		{
-			"Name": "LiveLinkMvnPlugin",
+			"Name": "nDisplay",
 			"Enabled": true,
-			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/content/8665afd60be74d39a08f1410c3dc333b"
+			"SupportedTargetPlatforms": [
+				"Win64",
+				"Linux"
+			]
+		},
+		{
+			"Name": "TextureShare",
+			"Enabled": true
+		},
+		{
+			"Name": "LightAct",
+			"Enabled": true,
+			"SupportedTargetPlatforms": [
+				"Win64"
+			]
 		}
 	]
 }
