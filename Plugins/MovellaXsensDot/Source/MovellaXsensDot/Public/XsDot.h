@@ -63,13 +63,14 @@ private:
 	void OnError(const XsResultValue result, const FString error) override;
 };
 
-
+// 병렬 처리를 위한 비동기 작업
 class FAsyncConnectDevices : public FNonAbandonableTask
 {
 public:
-	FAsyncConnectDevices(XsDotCallbackBridge& xsDotHelper) : XsDotHelper(xsDotHelper) {}
+	FAsyncConnectDevices(XsDotCallbackBridge& xsDotHelper, XsPortInfo& xsPortInfo) : XsDotHelper(xsDotHelper), XsPortInfo(xsPortInfo) {}
 	FORCEINLINE TStatId GetStatId() const { RETURN_QUICK_DECLARE_CYCLE_STAT(FAsyncConnectDevices, STATGROUP_ThreadPoolAsyncTasks); }
 
+	XsPortInfo& XsPortInfo;
 	XsDotCallbackBridge& XsDotHelper;
 
 	void DoWork();

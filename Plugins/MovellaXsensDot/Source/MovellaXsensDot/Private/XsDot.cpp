@@ -23,7 +23,6 @@ UXsDot::UXsDot()
 
 void UXsDot::StartScanning()
 {
-	OnDeviceDetected = onDeviceDetected;
 	XsDotHelper->StartScanning();
 }
 
@@ -34,16 +33,17 @@ void UXsDot::StopScanning()
 
 void UXsDot::ConnectDevices()
 {
-	OnDeviceConnectionTryFinished = onDeviceConnectionResult;
-
 	UE_LOG(XsDot,Log,TEXT("ConnectDevices function called"));
 
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [&]()
 	{
-		auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper);
-		deviceConnector->StartBackgroundTask();
-		deviceConnector->EnsureCompletion();
-		delete deviceConnector;
+			for (auto& device : XsDotHelper->GetDetectedDevices())
+			{
+				auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper, device);
+				deviceConnector->StartBackgroundTask();
+				deviceConnector->EnsureCompletion();
+				delete deviceConnector;
+			}
 	});
 }
 
@@ -115,8 +115,5 @@ void UXsDot::OnError(const XsResultValue result, const FString error)
 
 void FAsyncConnectDevices::DoWork()
 {
-	for(auto& device : XsDotHelper.GetDetectedDevices())
-	{
-		bool result = XsDotHelper.ConnectDot(device);
-	}
+	XsDotHelper.ConnectDot(XsPortInfo);
 }
