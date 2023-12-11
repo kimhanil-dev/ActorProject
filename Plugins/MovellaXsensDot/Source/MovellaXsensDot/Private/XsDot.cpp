@@ -35,16 +35,16 @@ void UXsDot::ConnectDevices()
 {
 	UE_LOG(XsDot,Log,TEXT("ConnectDevices function called"));
 
-	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [&]()
+	for (auto& device : XsDotHelper->GetDetectedDevices())
 	{
-			for (auto& device : XsDotHelper->GetDetectedDevices())
+		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [&]()
 			{
 				auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper, device);
 				deviceConnector->StartBackgroundTask();
 				deviceConnector->EnsureCompletion();
 				delete deviceConnector;
-			}
-	});
+			});
+	}
 }
 
 #pragma endregion UFUNCTIONs

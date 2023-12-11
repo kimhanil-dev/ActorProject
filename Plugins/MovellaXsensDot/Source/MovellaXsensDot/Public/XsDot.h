@@ -20,6 +20,14 @@ public:
 	// Sets default values for this component's properties
 	UXsDot();
 
+	DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnDeviceConnectionTryFinished, FString, deviceAddress, bool, isSuccess);
+	FOnDeviceConnectionTryFinished OnDeviceConnectionTryFinished;
+
+	DECLARE_DYNAMIC_DELEGATE_OneParam(FOnDeviceDetected, FString, deviceAddress);
+	FOnDeviceDetected OnDeviceDetected;
+
+	//DECLARE_DELEGATE_
+
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void GetDetectedDeviceName(TArray<FXsPortInfo>& devices);
 
@@ -29,15 +37,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void SetLiveDataOutputRate(const EOutputRate& rate);
 
-	DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnDeviceConnectionTryFinished, FString, deviceAddress, bool, isSuccess);
-	FOnDeviceConnectionTryFinished OnDeviceConnectionTryFinished;
-	
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void ConnectDevices();
 
-
-	DECLARE_DYNAMIC_DELEGATE_OneParam(FOnDeviceDetected, FString, deviceAddress);
-	FOnDeviceDetected OnDeviceDetected;
 	
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void StartScanning();
@@ -45,6 +47,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void StopScanning();
+
 
 
 protected:
@@ -63,7 +66,7 @@ private:
 	void OnError(const XsResultValue result, const FString error) override;
 };
 
-// 병렬 처리를 위한 비동기 작업
+// 병렬 처리를 위한 비동기 작업 클래스
 class FAsyncConnectDevices : public FNonAbandonableTask
 {
 public:
