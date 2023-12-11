@@ -20,8 +20,9 @@ public:
 	// Sets default values for this component's properties
 	UXsDot();
 
-	DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnDeviceConnectionTryFinished, FString, deviceAddress, bool, isSuccess);
-	FOnDeviceConnectionTryFinished OnDeviceConnectionTryFinished;
+	// ConnectDevices 함수의 결과를 받기 위한 델리게이트
+	DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnDeviceConnectionResult, FString, deviceAddress, bool, isSuccess);
+	FOnDeviceConnectionResult OnDeviceConnectionResult;
 
 	DECLARE_DYNAMIC_DELEGATE_OneParam(FOnDeviceDetected, FString, deviceAddress);
 	FOnDeviceDetected OnDeviceDetected;
@@ -38,17 +39,13 @@ public:
 	void SetLiveDataOutputRate(const EOutputRate& rate);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	void ConnectDevices();
+	void ConnectDevices(const FOnDeviceConnectionResult& onDeviceConnectionResult);
 
-	
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	void StartScanning();
-
+	void StartScanning(const FOnDeviceDetected& onDeviceDetected);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void StopScanning();
-
-
 
 protected:
 	// Called when the game starts
@@ -70,9 +67,10 @@ private:
 class FAsyncConnectDevices : public FNonAbandonableTask
 {
 public:
-	FAsyncConnectDevices(XsDotCallbackBridge& xsDotHelper, XsPortInfo& xsPortInfo) : XsDotHelper(xsDotHelper), XsPortInfo(xsPortInfo) {}
+	FAsyncConnectDevices(XsDotCallbackBridge& xsDotHelper, XsPortInfo& xsPortInfo, bool& result) : XsDotHelper(xsDotHelper), XsPortInfo(xsPortInfo),Result(result) {}
 	FORCEINLINE TStatId GetStatId() const { RETURN_QUICK_DECLARE_CYCLE_STAT(FAsyncConnectDevices, STATGROUP_ThreadPoolAsyncTasks); }
 
+	bool& Result;
 	XsPortInfo& XsPortInfo;
 	XsDotCallbackBridge& XsDotHelper;
 

@@ -21,9 +21,12 @@ struct FXsPortInfo
 	FXsPortInfo(const XsPortInfo& portInfo)
 		:PortName(*XDSTR_TO_UESTR(portInfo.portName()))
 		, DeviceID(*XDOBJ_TO_UESTR(portInfo.deviceId()))
-		, BluetoothAddress(*XDSTR_TO_UESTR(portInfo.bluetoothAddress()))
-	{
-	}
+		, BluetoothAddress(*XDSTR_TO_UESTR(portInfo.bluetoothAddress())){}
+	FXsPortInfo(const FXsPortInfo& xsPortInfo)
+		:PortName(xsPortInfo.PortName)
+		, DeviceID(xsPortInfo.DeviceID)
+		, BluetoothAddress(xsPortInfo.BluetoothAddress){}
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Xsens")
 	FString PortName;

@@ -21,8 +21,9 @@ UXsDot::UXsDot()
 
 #pragma region UFUNCTIONs
 
-void UXsDot::StartScanning()
+void UXsDot::StartScanning(const FOnDeviceDetected& onDeviceDetected)
 {
+	OnDeviceDetected = onDeviceDetected;
 	XsDotHelper->StartScanning();
 }
 
@@ -31,19 +32,27 @@ void UXsDot::StopScanning()
 	XsDotHelper->StopScanning();
 }
 
-void UXsDot::ConnectDevices()
+void UXsDot::ConnectDevices(const FOnDeviceConnectionResult& onDeviceConnectionResult)
 {
+	OnDeviceConnectionResult = onDeviceConnectionResult;
+	
 	UE_LOG(XsDot,Log,TEXT("ConnectDevices function called"));
 
 	for (auto& device : XsDotHelper->GetDetectedDevices())
 	{
 		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [&]()
+		{
+			bool result = false; 
+			auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper, device,result);
+			deviceConnector->StartBackgroundTask();
+			deviceConnector->EnsureCompletion();
+			delete deviceConnector;
+
+			AsyncTask(ENamedThreads::GameThread, [&]()
 			{
-				auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper, device);
-				deviceConnector->StartBackgroundTask();
-				deviceConnector->EnsureCompletion();
-				delete deviceConnector;
+				OnDeviceConnectionResult.Execute(XDSTR_TO_UESTR(device.bluetoothAddress()), result);
 			});
+		});
 	}
 }
 
@@ -104,7 +113,10 @@ void UXsDot::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponent
 
 void UXsDot::OnAdvertisementFound(const FXsPortInfo& portInfo)
 {
-	//OnDeviceDetected.Execute(portInfo.BluetoothAddress);
+	AsyncTask(ENamedThreads::GameThread, [=]()
+	{
+		OnDeviceDetected.Execute(portInfo.BluetoothAddress);
+	});
 }
 
 void UXsDot::OnError(const XsResultValue result, const FString error)
@@ -115,5 +127,5 @@ void UXsDot::OnError(const XsResultValue result, const FString error)
 
 void FAsyncConnectDevices::DoWork()
 {
-	XsDotHelper.ConnectDot(XsPortInfo);
+	Result = XsDotHelper.ConnectDot(XsPortInfo);
 }
