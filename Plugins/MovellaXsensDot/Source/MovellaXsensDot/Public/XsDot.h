@@ -33,7 +33,7 @@ public:
 	void GetDetectedDeviceName(TArray<FXsPortInfo>& devices);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	void GetLiveData(const FString deviceBluetoothAddress, FVector& rotation, FVector& acceleration, bool& valid);
+	void GetLiveData(const FString deviceBluetoothAddress, FVector& rotation, FVector& acceleration, FQuat& quat, bool& valid);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void SetLiveDataOutputRate(const EOutputRate& rate);
@@ -46,6 +46,17 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void StopScanning();
+
+	/** reset yaw orientation to current device's yaw */
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	void ResetOrientation();
+
+	/** return XsDot coordinate system vector to unreal engine coordinate system vector */
+	UFUNCTION(BlueprintPure, Category = "Xsens Dot | Utill")
+	static FVector XsDotVectorToUEVector(const FVector xsVector);
+	UFUNCTION(BlueprintPure, Category = "Xsens Dot | Utill")
+	static FRotator XsDotRotatorToUERotator(const FRotator xsRotator);
+
 
 protected:
 	// Called when the game starts

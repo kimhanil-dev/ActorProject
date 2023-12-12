@@ -90,9 +90,11 @@ public:
 
 	// packet에서 데이터를 추출하는 함수로
 	// 데이터가 없거나 추출에 실패하면 false를 리턴함
-	bool GetLiveData(const FString& deviceBluetoothAddress, FVector& outRotation, FVector& outAcc);
+	bool GetLiveData(const FString& deviceBluetoothAddress, FVector& outRotation, FVector& outAcc, FQuat& quat);
 
 	void SetLiveDataOutputRate(const EOutputRate& rate = EOutputRate::OR_30HZ);
+
+	void ResetOrientation();
 
 	void Cleanup();
 

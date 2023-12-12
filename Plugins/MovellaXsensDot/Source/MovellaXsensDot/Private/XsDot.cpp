@@ -32,6 +32,26 @@ void UXsDot::StopScanning()
 	XsDotHelper->StopScanning();
 }
 
+void UXsDot::ResetOrientation()
+{
+	XsDotHelper->ResetOrientation();
+}
+
+FVector UXsDot::XsDotVectorToUEVector(const FVector xsVector)
+{
+	FVector ueVector;
+	ueVector.X = xsVector.Y;
+	ueVector.Y = xsVector.X;
+	ueVector.Z = xsVector.Z;
+
+	return ueVector;
+}
+
+FRotator UXsDot::XsDotRotatorToUERotator(const FRotator xsRotator)
+{
+	return FRotator(xsRotator.Roll, -xsRotator.Yaw , xsRotator.Pitch);
+}
+
 void UXsDot::ConnectDevices(const FOnDeviceConnectionResult& onDeviceConnectionResult)
 {
 	OnDeviceConnectionResult = onDeviceConnectionResult;
@@ -42,7 +62,7 @@ void UXsDot::ConnectDevices(const FOnDeviceConnectionResult& onDeviceConnectionR
 	{
 		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [&]()
 		{
-			bool result = false; 
+			bool result = true; 
 			auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper, device,result);
 			deviceConnector->StartBackgroundTask();
 			deviceConnector->EnsureCompletion();
@@ -67,9 +87,9 @@ void UXsDot::GetDetectedDeviceName(TArray<FXsPortInfo>& devices)
 	}
 }
 
-void UXsDot::GetLiveData(const FString deviceBluetoothAddress, FVector& rotation, FVector& acceleration, bool& valid)
+void UXsDot::GetLiveData(const FString deviceBluetoothAddress, FVector& rotation, FVector& acceleration, FQuat& quat, bool& valid)
 {
-	valid = XsDotHelper->GetLiveData(deviceBluetoothAddress, rotation, acceleration);
+	valid = XsDotHelper->GetLiveData(deviceBluetoothAddress, rotation, acceleration, quat);
 }
 
 void UXsDot::SetLiveDataOutputRate(const EOutputRate& rate)

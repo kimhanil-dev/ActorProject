@@ -77,7 +77,7 @@ bool XsDotCallbackBridge::ConnectDot(XsPortInfo portInfo)
 			UE_LOG(XsDot, Log, TEXT("%s\n"), *FString(f.label()));
 
 		UE_LOG(XsDot, Log, TEXT("Current profile: %s"), *FString(newDevice->onboardFilterProfile().label()));
-		
+
 		if (newDevice->setOnboardFilterProfile(XsString("Dynamic")))
 		{
 			UE_LOG(XsDot, Log, TEXT("Successfully set profile to General"));
@@ -87,25 +87,17 @@ bool XsDotCallbackBridge::ConnectDot(XsPortInfo portInfo)
 			XDLOG(Error, TEXT("Setting filter profile failed!"));
 		}
 
-		UE_LOG(XsDot, Log, TEXT("Setting quaternion CSV output"));
+	/*	UE_LOG(XsDot, Log, TEXT("Setting quaternion CSV output"));
 		newDevice->setLogOptions(XsLogOptions::Quaternion);
 
 		XsString logFileName = XsString("logfile_") << newDevice->bluetoothAddress().replacedAll(":", "-") << ".csv";
 		UE_LOG(XsDot, Log, TEXT("Enable logging to: %s"), *XDSTR_TO_UESTR(logFileName));
 
 		if (!newDevice->enableLogging(logFileName))
-			XDLOG(Error, TEXT("Failed to enable logging. Reason: %s"),*XDSTR_TO_UESTR(newDevice->lastResultText()));
-
-		UE_LOG(XsDot, Log, TEXT("Putting device into measurement mode."));
+			XDLOG(Error, TEXT("Failed to enable logging. Reason: %s"),*XDSTR_TO_UESTR(newDevice->lastResultText()));*/
+		
+		UE_LOG(XsDot, Log, TEXT("Putting device into measurement mode."))
 		if (!newDevice->startMeasurement(XsPayloadMode::ExtendedEuler))
-		{
-			XDLOG(Error, TEXT("Could not put device into measurement mode. Reason: %s"), *XDSTR_TO_UESTR(newDevice->lastResultText()));
-		}
-		if (!newDevice->startMeasurement(XsPayloadMode::HighFidelity))
-		{
-			XDLOG(Error, TEXT("Could not put device into measurement mode. Reason: %s"), *XDSTR_TO_UESTR(newDevice->lastResultText()));
-		}
-		if (!newDevice->startMeasurement(XsPayloadMode::FreeAcceleration))
 		{
 			XDLOG(Error, TEXT("Could not put device into measurement mode. Reason: %s"), *XDSTR_TO_UESTR(newDevice->lastResultText()));
 		}
@@ -164,7 +156,7 @@ TArray<const XsDotDevice*> XsDotCallbackBridge::GetConnectedDevices()
 	return connectedDevices;
 }
 
-bool XsDotCallbackBridge::GetLiveData(const FString& deviceBluetoothAddress, FVector& outRotation, FVector& outAcc)
+bool XsDotCallbackBridge::GetLiveData(const FString& deviceBluetoothAddress, FVector& outRotation, FVector& outAcc, FQuat& quat)
 {
 	xsens::Lock locky(&mMutex);
 
@@ -174,10 +166,12 @@ bool XsDotCallbackBridge::GetLiveData(const FString& deviceBluetoothAddress, FVe
 	
 	XsDataPacket packetData = packets.front();
 	packets.pop_front();
-
+	
 	if(packetData.containsOrientation())
 	{
 		XsEuler euler = packetData.orientationEuler();
+		XsQuaternion xsQuat = packetData.orientationQuaternion();
+		quat = FQuat(xsQuat.x(), xsQuat.y(), xsQuat.z(), xsQuat.w());
 		outRotation = FVector3d(euler.x(), euler.y(), euler.z());
 	}
 
@@ -196,6 +190,11 @@ bool XsDotCallbackBridge::GetLiveData(const FString& deviceBluetoothAddress, FVe
 		XsVector acc = packetData.calibratedAcceleration();
 		outAcc = FVector3d(acc[0], acc[1], acc[2]);
 	}
+	else if (packetData.containsVelocity())
+	{
+		XsVector acc = packetData.velocity();
+		outAcc = FVector3d(acc[0], acc[1], acc[2]);
+	}
 
 	return true;
 }
@@ -205,6 +204,14 @@ void XsDotCallbackBridge::SetLiveDataOutputRate(const EOutputRate& rate)
 	for (auto* device : mConnectedDevices)
 	{
 		device->setOutputRate(static_cast<uint8>(rate));
+	}
+}
+
+void XsDotCallbackBridge::ResetOrientation()
+{
+	for (auto* device : mConnectedDevices)
+	{
+		device->resetOrientation(XsResetMethod::XRM_Heading);
 	}
 }
 
