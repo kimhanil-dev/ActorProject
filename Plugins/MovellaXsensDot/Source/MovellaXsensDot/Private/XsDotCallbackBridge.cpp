@@ -55,6 +55,9 @@ XsPortInfoArray XsDotCallbackBridge::DetectUsbDevices()
 
 bool XsDotCallbackBridge::ConnectDot(XsPortInfo portInfo)
 {
+	if(mConnectionManager == nullptr)
+		return false;
+
 	if (portInfo.isBluetooth())
 	{
 		UE_LOG(XsDot, Log, TEXT("Opening DOT with address: %s"), *XDSTR_TO_UESTR(portInfo.bluetoothAddress()));
@@ -78,7 +81,7 @@ bool XsDotCallbackBridge::ConnectDot(XsPortInfo portInfo)
 
 		UE_LOG(XsDot, Log, TEXT("Current profile: %s"), *FString(newDevice->onboardFilterProfile().label()));
 
-		if (newDevice->setOnboardFilterProfile(XsString("Dynamic")))
+		if (newDevice->setOnboardFilterProfile(XsString("General")))
 		{
 			UE_LOG(XsDot, Log, TEXT("Successfully set profile to General"));
 		}
@@ -97,7 +100,7 @@ bool XsDotCallbackBridge::ConnectDot(XsPortInfo portInfo)
 			XDLOG(Error, TEXT("Failed to enable logging. Reason: %s"),*XDSTR_TO_UESTR(newDevice->lastResultText()));*/
 		
 		UE_LOG(XsDot, Log, TEXT("Putting device into measurement mode."))
-		if (!newDevice->startMeasurement(XsPayloadMode::ExtendedEuler))
+		if (!newDevice->startMeasurement(XsPayloadMode::ExtendedQuaternion))
 		{
 			XDLOG(Error, TEXT("Could not put device into measurement mode. Reason: %s"), *XDSTR_TO_UESTR(newDevice->lastResultText()));
 		}
@@ -156,7 +159,7 @@ TArray<const XsDotDevice*> XsDotCallbackBridge::GetConnectedDevices()
 	return connectedDevices;
 }
 
-bool XsDotCallbackBridge::GetLiveData(const FString& deviceBluetoothAddress, FVector& outRotation, FVector& outAcc, FQuat& quat)
+bool XsDotCallbackBridge::GetLiveData(const FString& deviceBluetoothAddress, FRotator& outRotation, FVector& outAcc, FQuat& quat)
 {
 	xsens::Lock locky(&mMutex);
 
@@ -170,31 +173,39 @@ bool XsDotCallbackBridge::GetLiveData(const FString& deviceBluetoothAddress, FVe
 	if(packetData.containsOrientation())
 	{
 		XsEuler euler = packetData.orientationEuler();
-		XsQuaternion xsQuat = packetData.orientationQuaternion();
+		XsQuaternion xsQuat = packetData.orientationQuaternion(XsDataIdentifier::XDI_Quaternion);
 		quat = FQuat(xsQuat.x(), xsQuat.y(), xsQuat.z(), xsQuat.w());
-		outRotation = FVector3d(euler.x(), euler.y(), euler.z());
+		outRotation = FRotator(euler.pitch(), euler.yaw(), euler.roll());
 	}
 
-	if(packetData.containsAccelerationHR())
+	if (packetData.containsVelocity())
 	{
-		XsVector acc = packetData.accelerationHR();
-		outAcc = FVector3d(acc[0], acc[1], acc[2]);
+		XsVector velocity = packetData.velocity(XsDataIdentifier::XDI_AngularVelocityGroup);
+		outAcc = FVector3d(velocity[0], velocity[1], velocity[2]);
 	}
-	else if (packetData.containsFreeAcceleration())
-	{
-		XsVector acc = packetData.freeAcceleration();
-		outAcc = FVector3d(acc[0], acc[1], acc[2]);
-	}
-	else if (packetData.containsCalibratedAcceleration())
-	{
-		XsVector acc = packetData.calibratedAcceleration();
-		outAcc = FVector3d(acc[0], acc[1], acc[2]);
-	}
-	else if (packetData.containsVelocity())
-	{
-		XsVector acc = packetData.velocity();
-		outAcc = FVector3d(acc[0], acc[1], acc[2]);
-	}
+
+	return true;
+}
+
+bool XsDotCallbackBridge::GetQuaternionData(const FString& deviceBluetoothAddress, FQuat& outQuat)
+{
+	xsens::Lock locky(&mMutex);
+
+	auto& packets = mPackets[deviceBluetoothAddress];
+	if (packets.size() == 0)
+		return false;
+
+	XsDataPacket packetData = packets.front();
+	packets.pop_front();
+
+	// 개발 모드가 아니라면 GetQuaternion은 항상 성공해야 합니다.
+#if  defined(UE_BUILD_DEBUG) | defined(UE_EDITOR) | defined(UE_BUILD_DEVELOPMENT)
+	if (!packetData.containsOrientation())
+		XDLOG(Error, TEXT("packetData does not contain orientation data"));
+#endif
+
+	XsQuaternion xsQuat = packetData.orientationQuaternion(XsDataIdentifier::XDI_Quaternion);
+	outQuat = FQuat(xsQuat.x(), xsQuat.y(), xsQuat.z(), xsQuat.w());
 
 	return true;
 }
@@ -251,6 +262,14 @@ void XsDotCallbackBridge::onLiveDataAvailable(XsDotDevice* device, const XsDataP
 	else
 	{
 		UE_LOG(XsDot, Error, TEXT("Live data error(Device : %s)'s packet is null"));
+	}
+}
+
+void XsDotCallbackBridge::onButtonClicked(XsDotDevice* device, uint32_t timestamp)
+{
+	for (IXsDotCallBackListener* listener : mListeners)
+	{
+		listener->onButtonClicked(device, timestamp);
 	}
 }
 

@@ -7,6 +7,8 @@
 
 #include "movelladot_pc_sdk.h"
 
+#include "Misc/MessageDialog.h"
+
 // Sets default values for this component's properties
 UXsDot::UXsDot()
 {
@@ -62,18 +64,54 @@ void UXsDot::ConnectDevices(const FOnDeviceConnectionResult& onDeviceConnectionR
 	{
 		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [&]()
 		{
+			++ThreadCounter;
 			bool result = true; 
 			auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper, device,result);
 			deviceConnector->StartBackgroundTask();
 			deviceConnector->EnsureCompletion();
 			delete deviceConnector;
+			--ThreadCounter;
 
 			AsyncTask(ENamedThreads::GameThread, [&]()
 			{
-				OnDeviceConnectionResult.Execute(XDSTR_TO_UESTR(device.bluetoothAddress()), result);
+				if(!bIsGameEnd)
+					OnDeviceConnectionResult.Execute(XDSTR_TO_UESTR(device.bluetoothAddress()), result);
 			});
 		});
 	}
+}
+
+void UXsDot::ConnectDevice(const FString deviceAddress, const FOnDeviceConnectionResult& onDeviceConnectionResult, bool& deviceNotFound)
+{
+	OnDeviceConnectionResult = onDeviceConnectionResult;
+	deviceNotFound = false;
+
+	for (auto& device : XsDotHelper->GetDetectedDevices())
+	{
+		if (XDSTR_TO_UESTR(device.bluetoothAddress()) == deviceAddress)
+		{
+			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [&]()
+			{
+				++ThreadCounter;
+				bool result = true;
+				auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper, device, result);
+				deviceConnector->StartBackgroundTask();
+				deviceConnector->EnsureCompletion();
+				delete deviceConnector;
+				--ThreadCounter;
+
+				AsyncTask(ENamedThreads::GameThread, [&]()
+					{
+						if (!bIsGameEnd)
+							OnDeviceConnectionResult.Execute(XDSTR_TO_UESTR(device.bluetoothAddress()), result);
+					});
+			});
+
+			return;
+		}
+	}
+	
+	deviceNotFound = true;
 }
 
 #pragma endregion UFUNCTIONs
@@ -87,7 +125,7 @@ void UXsDot::GetDetectedDeviceName(TArray<FXsPortInfo>& devices)
 	}
 }
 
-void UXsDot::GetLiveData(const FString deviceBluetoothAddress, FVector& rotation, FVector& acceleration, FQuat& quat, bool& valid)
+void UXsDot::GetLiveData(const FString& deviceBluetoothAddress, FRotator& rotation, FVector& acceleration, FQuat& quat, bool& valid)
 {
 	valid = XsDotHelper->GetLiveData(deviceBluetoothAddress, rotation, acceleration, quat);
 }
@@ -111,6 +149,14 @@ void UXsDot::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
+	// wait for thread complite
+	FMessageDialog::Open(EAppMsgType::Type::Ok, FText::FromString(FString::Printf(TEXT("Waiting for thread safe cleanup..."))));
+	bIsGameEnd = true;
+	while(ThreadCounter > 0)
+	{
+		FPlatformProcess::Sleep(0.1f);
+	}
+
 	if (XsDotHelper != nullptr)
 	{
 		XsDotHelper->Cleanup();
@@ -122,7 +168,6 @@ void UXsDot::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void UXsDot::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
 	// ...
 }
 
@@ -137,6 +182,14 @@ void UXsDot::OnAdvertisementFound(const FXsPortInfo& portInfo)
 	{
 		OnDeviceDetected.Execute(portInfo.BluetoothAddress);
 	});
+}
+
+void UXsDot::onButtonClicked(XsDotDevice* device, uint32_t timestamp)
+{
+	if (device != nullptr)
+	{
+		OnButtonClicked.Broadcast(XDSTR_TO_UESTR(device->bluetoothAddress()),static_cast<int>(timestamp));
+	}
 }
 
 void UXsDot::OnError(const XsResultValue result, const FString error)

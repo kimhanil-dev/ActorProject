@@ -27,19 +27,26 @@ public:
 	DECLARE_DYNAMIC_DELEGATE_OneParam(FOnDeviceDetected, FString, deviceAddress);
 	FOnDeviceDetected OnDeviceDetected;
 
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnButtonClicked, FString, deviceAddress, int, timestamp);
+	UPROPERTY(BlueprintAssignable, Category = "Xsens Dot")
+	FOnButtonClicked OnButtonClicked;
+
 	//DECLARE_DELEGATE_
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void GetDetectedDeviceName(TArray<FXsPortInfo>& devices);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	void GetLiveData(const FString deviceBluetoothAddress, FVector& rotation, FVector& acceleration, FQuat& quat, bool& valid);
+	void GetLiveData(const FString& deviceBluetoothAddress, FRotator& rotation, FVector& acceleration, FQuat& quat, bool& valid);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void SetLiveDataOutputRate(const EOutputRate& rate);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void ConnectDevices(const FOnDeviceConnectionResult& onDeviceConnectionResult);
+
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	void ConnectDevice(const FString deviceAddress, const FOnDeviceConnectionResult& onDeviceConnectionResult, bool& deviceNotFound);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void StartScanning(const FOnDeviceDetected& onDeviceDetected);
@@ -69,16 +76,21 @@ public:
 private:
 	XsDotCallbackBridge* XsDotHelper = nullptr;
 
+	// for check runnging thread
+	unsigned int ThreadCounter;
+	bool bIsGameEnd = false;
+
 	// Inherited via IXsDotCallBackListener
 	void OnAdvertisementFound(const FXsPortInfo& portInfo) override;
 	void OnError(const XsResultValue result, const FString error) override;
+	void onButtonClicked(XsDotDevice* device, uint32_t timestamp) override;
 };
 
 // 병렬 처리를 위한 비동기 작업 클래스
 class FAsyncConnectDevices : public FNonAbandonableTask
 {
 public:
-	FAsyncConnectDevices(XsDotCallbackBridge& xsDotHelper, XsPortInfo& xsPortInfo, bool& result) : XsDotHelper(xsDotHelper), XsPortInfo(xsPortInfo),Result(result) {}
+	FAsyncConnectDevices(XsDotCallbackBridge& xsDotHelper, XsPortInfo& xsPortInfo, bool& result) : Result(result), XsPortInfo(xsPortInfo), XsDotHelper(xsDotHelper) {}
 	FORCEINLINE TStatId GetStatId() const { RETURN_QUICK_DECLARE_CYCLE_STAT(FAsyncConnectDevices, STATGROUP_ThreadPoolAsyncTasks); }
 
 	bool& Result;

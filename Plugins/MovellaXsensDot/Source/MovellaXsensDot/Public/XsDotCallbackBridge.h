@@ -57,6 +57,8 @@ class IXsDotCallBackListener
 public:
 	virtual void OnAdvertisementFound(const FXsPortInfo& portInfo) = 0;
 	virtual void OnError(const XsResultValue result, const FString error) = 0;
+	virtual void onButtonClicked(XsDotDevice* device, uint32_t timestamp) = 0;
+
 	// 더 많은 정보를 수신받고 싶으면 인터페이스를 추가로 구현할 것
 };
 
@@ -90,7 +92,8 @@ public:
 
 	// packet에서 데이터를 추출하는 함수로
 	// 데이터가 없거나 추출에 실패하면 false를 리턴함
-	bool GetLiveData(const FString& deviceBluetoothAddress, FVector& outRotation, FVector& outAcc, FQuat& quat);
+	bool GetLiveData(const FString& deviceBluetoothAddress, FRotator& outRotation, FVector& outAcc, FQuat& quat);
+	bool GetQuaternionData(const FString& deviceBluetoothAddress, FQuat& outQuat);
 
 	void SetLiveDataOutputRate(const EOutputRate& rate = EOutputRate::OR_30HZ);
 
@@ -108,6 +111,7 @@ protected:
 	std::map<FString,std::list<XsDataPacket>> mPackets;
 	mutable xsens::Mutex mMutex;
 
+
 	void onAdvertisementFound(const XsPortInfo* portInfo) override;
 	void onError(XsResultValue result, const XsString* error) override;
 	//void onBatteryUpdated(XsDotDevice* device, int batteryLevel, int chargingStatus) override;
@@ -116,7 +120,7 @@ protected:
 	//void onDeviceUpdateDone(const XsPortInfo* portInfo, XsDotFirmwareUpdateResult result) override;
 	//void onRecordingStopped(XsDotDevice* device) override;
 	//void onDeviceStateChanged(XsDotDevice* device, XsDeviceState newState, XsDeviceState oldState) override;
-	//void onButtonClicked(XsDotDevice* device, uint32_t timestamp) override;
+	void onButtonClicked(XsDotDevice* device, uint32_t timestamp) override;
 	//void onProgressUpdated(XsDotUsbDevice* device, int current, int total, const XsString* identifier) override;
 	//void onRecordedDataAvailable(XsDotUsbDevice* device, const XsDataPacket* packet) override;
 	//void onRecordedDataAvailable(XsDotDevice* device, const XsDataPacket* packet) override;

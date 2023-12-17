@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "movelladot_pc_sdk.h"
 
+#pragma warning(disable : 4127)
+
 DECLARE_LOG_CATEGORY_EXTERN(XsDot, Log, All); 
 
 #define XDLOG_MINIMAL(Verbosity, Format, ...) UE_LOG(XsDot, Verbosity, Format, __VA_ARGS__)
