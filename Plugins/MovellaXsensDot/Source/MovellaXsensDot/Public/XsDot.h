@@ -36,8 +36,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void GetDetectedDeviceName(TArray<FXsPortInfo>& devices);
 
+	/*UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	void GetLiveData(const FString& deviceBluetoothAddress, FRotator& rotation, FVector& acceleration, FQuat& quat, bool& valid);*/
+
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	void GetLiveData(const FString& deviceBluetoothAddress, FRotator& rotation, FVector& acceleration, FQuat& quat, bool& valid);
+	bool GetQuaternionData(const FString& devicebluetoothAddress, FQuat& quat);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void SetLiveDataOutputRate(const EOutputRate& rate);
@@ -64,6 +67,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Xsens Dot | Utill")
 	static FRotator XsDotRotatorToUERotator(const FRotator xsRotator);
 
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot", meta = (ToolTip = "false if device address not found"))
+	bool BindRotationToXsDotDevice(USceneComponent* sceneComp, const FString& deviceAddress, const bool bIsLocal);
 
 protected:
 	// Called when the game starts
@@ -75,6 +80,13 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 private:
 	XsDotCallbackBridge* XsDotHelper = nullptr;
+	TMap<FString, FQuat> XsDotQuats;
+	struct FBindedSceneCompInfo
+	{
+		USceneComponent* SceneComp;
+		bool bIsLocal;
+	};
+	TMap<FString, FBindedSceneCompInfo> XsDotRotationBindedSceneComps;
 
 	// for check runnging thread
 	unsigned int ThreadCounter;
@@ -90,11 +102,11 @@ private:
 class FAsyncConnectDevices : public FNonAbandonableTask
 {
 public:
-	FAsyncConnectDevices(XsDotCallbackBridge& xsDotHelper, XsPortInfo& xsPortInfo, bool& result) : Result(result), XsPortInfo(xsPortInfo), XsDotHelper(xsDotHelper) {}
+	FAsyncConnectDevices(XsDotCallbackBridge& xsDotHelper, const FString& deviceAddress, bool& result) : Result(result), DeviceAddress(deviceAddress), XsDotHelper(xsDotHelper) {}
 	FORCEINLINE TStatId GetStatId() const { RETURN_QUICK_DECLARE_CYCLE_STAT(FAsyncConnectDevices, STATGROUP_ThreadPoolAsyncTasks); }
 
 	bool& Result;
-	XsPortInfo& XsPortInfo;
+	const FString& DeviceAddress;
 	XsDotCallbackBridge& XsDotHelper;
 
 	void DoWork();

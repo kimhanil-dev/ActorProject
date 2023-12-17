@@ -54,6 +54,12 @@ FRotator UXsDot::XsDotRotatorToUERotator(const FRotator xsRotator)
 	return FRotator(xsRotator.Roll, -xsRotator.Yaw , xsRotator.Pitch);
 }
 
+bool UXsDot::BindRotationToXsDotDevice(USceneComponent* sceneComp, const FString& deviceAddress, const bool bIsLocal)
+{
+	XsDotRotationBindedSceneComps.Add(deviceAddress,{sceneComp, bIsLocal});
+	return true;
+}
+
 void UXsDot::ConnectDevices(const FOnDeviceConnectionResult& onDeviceConnectionResult)
 {
 	OnDeviceConnectionResult = onDeviceConnectionResult;
@@ -62,21 +68,32 @@ void UXsDot::ConnectDevices(const FOnDeviceConnectionResult& onDeviceConnectionR
 
 	for (auto& device : XsDotHelper->GetDetectedDevices())
 	{
-		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [&]()
+		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask,
+		[&XsDotHelper = this->XsDotHelper
+		, &OnDeviceConnectionResult = this->OnDeviceConnectionResult
+		, &ThreadCounter = this->ThreadCounter
+		, &bIsGameEnd = this->bIsGameEnd
+		, &XsDotQuats = this->XsDotQuats
+		, _deviceAddress = XDSTR_TO_UESTR(device.bluetoothAddress())]()
 		{
+
 			++ThreadCounter;
-			bool result = true; 
-			auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper, device,result);
+			bool result = false;
+			auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper, _deviceAddress, result);
 			deviceConnector->StartBackgroundTask();
 			deviceConnector->EnsureCompletion();
 			delete deviceConnector;
 			--ThreadCounter;
 
 			AsyncTask(ENamedThreads::GameThread, [&]()
-			{
-				if(!bIsGameEnd)
-					OnDeviceConnectionResult.Execute(XDSTR_TO_UESTR(device.bluetoothAddress()), result);
-			});
+				{
+					if (!bIsGameEnd)
+					{
+						OnDeviceConnectionResult.Execute(_deviceAddress, result);
+						XsDotQuats.Add(_deviceAddress, FQuat::Identity);
+					}
+
+				});
 		});
 	}
 }
@@ -86,30 +103,32 @@ void UXsDot::ConnectDevice(const FString deviceAddress, const FOnDeviceConnectio
 	OnDeviceConnectionResult = onDeviceConnectionResult;
 	deviceNotFound = false;
 
-	for (auto& device : XsDotHelper->GetDetectedDevices())
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, 
+	[&XsDotHelper = this->XsDotHelper
+	, &OnDeviceConnectionResult = this->OnDeviceConnectionResult
+	, &ThreadCounter = this->ThreadCounter
+	, &bIsGameEnd = this->bIsGameEnd
+	, &XsDotQuats = this->XsDotQuats
+	, _deviceAddress = deviceAddress]()
 	{
-		if (XDSTR_TO_UESTR(device.bluetoothAddress()) == deviceAddress)
+		++ThreadCounter;
+		bool result = false;
+		auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper, _deviceAddress, result);
+		deviceConnector->StartBackgroundTask();
+		deviceConnector->EnsureCompletion();
+		delete deviceConnector;
+		--ThreadCounter;
+
+		AsyncTask(ENamedThreads::GameThread, [&, __deviceAddress = _deviceAddress]()
 		{
-			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [&]()
+			OnDeviceConnectionResult.Execute(__deviceAddress, result);
+			if (result)
 			{
-				++ThreadCounter;
-				bool result = true;
-				auto deviceConnector = new FAsyncTask<FAsyncConnectDevices>(*XsDotHelper, device, result);
-				deviceConnector->StartBackgroundTask();
-				deviceConnector->EnsureCompletion();
-				delete deviceConnector;
-				--ThreadCounter;
+				XsDotQuats.Add(__deviceAddress, FQuat::Identity);
+			}
+		});
+	});
 
-				AsyncTask(ENamedThreads::GameThread, [&]()
-					{
-						if (!bIsGameEnd)
-							OnDeviceConnectionResult.Execute(XDSTR_TO_UESTR(device.bluetoothAddress()), result);
-					});
-			});
-
-			return;
-		}
-	}
 	
 	deviceNotFound = true;
 }
@@ -125,9 +144,16 @@ void UXsDot::GetDetectedDeviceName(TArray<FXsPortInfo>& devices)
 	}
 }
 
-void UXsDot::GetLiveData(const FString& deviceBluetoothAddress, FRotator& rotation, FVector& acceleration, FQuat& quat, bool& valid)
+bool UXsDot::GetQuaternionData(const FString& devicebluetoothAddress, FQuat& quat)
 {
-	valid = XsDotHelper->GetLiveData(deviceBluetoothAddress, rotation, acceleration, quat);
+	FQuat* result = XsDotQuats.Find(devicebluetoothAddress);
+	if (result != nullptr)
+	{
+		quat = *result;
+		return true;
+	}
+
+	return false;
 }
 
 void UXsDot::SetLiveDataOutputRate(const EOutputRate& rate)
@@ -169,6 +195,32 @@ void UXsDot::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponent
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	// ...
+
+	//Update binded scene components rotation
+	for (auto& xsDotQuat : XsDotQuats)
+	{
+		if (!XsDotHelper->GetQuaternionData(xsDotQuat.Key, xsDotQuat.Value))
+		{
+			return;
+		}
+
+		auto* bindingInfo = XsDotRotationBindedSceneComps.Find(xsDotQuat.Key);
+		if(bindingInfo == nullptr)
+		{
+			continue;
+		}
+		else
+		{
+			if (bindingInfo->bIsLocal)
+			{
+				bindingInfo->SceneComp->SetRelativeRotation(xsDotQuat.Value);
+			}
+			else
+			{
+				bindingInfo->SceneComp->SetWorldRotation(xsDotQuat.Value);
+			}
+		}
+	}
 }
 
 #pragma endregion UE Events
@@ -188,8 +240,11 @@ void UXsDot::onButtonClicked(XsDotDevice* device, uint32_t timestamp)
 {
 	if (device != nullptr)
 	{
-		OnButtonClicked.Broadcast(XDSTR_TO_UESTR(device->bluetoothAddress()),static_cast<int>(timestamp));
-	}
+		AsyncTask(ENamedThreads::GameThread, [=]()
+		{
+			OnButtonClicked.Broadcast(XDSTR_TO_UESTR(device->bluetoothAddress()),static_cast<int>(timestamp));
+		});
+}
 }
 
 void UXsDot::OnError(const XsResultValue result, const FString error)
@@ -200,5 +255,5 @@ void UXsDot::OnError(const XsResultValue result, const FString error)
 
 void FAsyncConnectDevices::DoWork()
 {
-	Result = XsDotHelper.ConnectDot(XsPortInfo);
+	Result = XsDotHelper.ConnectDot(DeviceAddress);
 }

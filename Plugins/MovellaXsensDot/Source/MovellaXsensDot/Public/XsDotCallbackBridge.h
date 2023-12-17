@@ -81,6 +81,7 @@ public:
 	// usb device detection
 	XsPortInfoArray DetectUsbDevices();
 
+	bool ConnectDot(const FString& deviceAddress);
 	bool ConnectDot(XsPortInfo portInfo);
 	//todo : connection에 실패했을 경우에 어떻게 알릴 것인지?
 	bool ConnectDots(const XsPortInfoArray& portInfos);
@@ -90,10 +91,11 @@ public:
 	XsPortInfoArray GetDetectedDevices();
 	TArray<const XsDotDevice*> GetConnectedDevices();
 
-	// packet에서 데이터를 추출하는 함수로
-	// 데이터가 없거나 추출에 실패하면 false를 리턴함
+
+	// !!! 주의 !!!
+	// Packet에서 값을 읽어오는 함수들은 Packet을 읽고 나면 내부에서 Packet을 삭제합니다.
 	bool GetLiveData(const FString& deviceBluetoothAddress, FRotator& outRotation, FVector& outAcc, FQuat& quat);
-	bool GetQuaternionData(const FString& deviceBluetoothAddress, FQuat& outQuat);
+	bool GetQuaternionData(const FString deviceBluetoothAddress, FQuat& outQuat);
 
 	void SetLiveDataOutputRate(const EOutputRate& rate = EOutputRate::OR_30HZ);
 

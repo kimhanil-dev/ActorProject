@@ -53,6 +53,19 @@ XsPortInfoArray XsDotCallbackBridge::DetectUsbDevices()
 	return mConnectionManager->detectUsbDevices();
 }
 
+bool XsDotCallbackBridge::ConnectDot(const FString& deviceAddress)
+{
+	for (const XsPortInfo& portInfo : GetDetectedDevices())
+	{
+		if (XDSTR_TO_UESTR(portInfo.bluetoothAddress()) == deviceAddress)
+		{
+			return ConnectDot(portInfo);
+		}
+	}
+
+	return false;
+}
+
 bool XsDotCallbackBridge::ConnectDot(XsPortInfo portInfo)
 {
 	if(mConnectionManager == nullptr)
@@ -164,7 +177,7 @@ bool XsDotCallbackBridge::GetLiveData(const FString& deviceBluetoothAddress, FRo
 	xsens::Lock locky(&mMutex);
 
 	auto& packets = mPackets[deviceBluetoothAddress];
-	if(packets.size() == 0)
+	if (packets.size() == 0)
 		return false;
 	
 	XsDataPacket packetData = packets.front();
@@ -187,7 +200,7 @@ bool XsDotCallbackBridge::GetLiveData(const FString& deviceBluetoothAddress, FRo
 	return true;
 }
 
-bool XsDotCallbackBridge::GetQuaternionData(const FString& deviceBluetoothAddress, FQuat& outQuat)
+bool XsDotCallbackBridge::GetQuaternionData(const FString deviceBluetoothAddress, FQuat& outQuat)
 {
 	xsens::Lock locky(&mMutex);
 
@@ -243,7 +256,7 @@ void XsDotCallbackBridge::onError(XsResultValue result, const XsString* error)
 	UE_LOG(XsDot,Error, TEXT("Error Code : %d. Error : %s"), result, *XDSTR_TO_UESTR((*error)));
 	for (IXsDotCallBackListener* listener : mListeners)
 	{
-		listener->OnError(result,*XDSTR_TO_UESTR((*error)));
+		listener->OnError(result,XDSTR_TO_UESTR((*error)));
 	}
 }
 
@@ -252,12 +265,12 @@ void XsDotCallbackBridge::onLiveDataAvailable(XsDotDevice* device, const XsDataP
 	xsens::Lock locky(&mMutex);
 	if (packet != nullptr)
 	{
-		auto& packetDatas = mPackets[*XDSTR_TO_UESTR(device->bluetoothAddress())];
+		auto& packetDatas = mPackets[XDSTR_TO_UESTR(device->bluetoothAddress())];
 		if (packetDatas.size() >= 30)
 		{
 			packetDatas.pop_front();
 		}
-		mPackets[*XDSTR_TO_UESTR(device->bluetoothAddress())].push_back(*packet);
+		mPackets[XDSTR_TO_UESTR(device->bluetoothAddress())].push_back(*packet);
 	}
 	else
 	{
