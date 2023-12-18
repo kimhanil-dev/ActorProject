@@ -54,10 +54,20 @@ FRotator UXsDot::XsDotRotatorToUERotator(const FRotator xsRotator)
 	return FRotator(xsRotator.Roll, -xsRotator.Yaw , xsRotator.Pitch);
 }
 
-bool UXsDot::BindRotationToXsDotDevice(USceneComponent* sceneComp, const FString& deviceAddress, const bool bIsLocal)
+bool UXsDot::BindToXsDot(const FString deviceAddress, UXsBindingComponent* target)
 {
-	XsDotRotationBindedSceneComps.Add(deviceAddress,{sceneComp, bIsLocal});
-	return true;
+	for (const auto& device : XsDotHelper->GetDetectedDevices())
+	{
+		if(XDSTR_TO_UESTR(device.bluetoothAddress()).Equals(deviceAddress))
+		{
+			XsDotBindingComps.Add(deviceAddress, target);
+			return true;
+		}
+	}
+
+	XDLOG(Error, TEXT("Device with address %s not found"), *deviceAddress);
+
+	return false;
 }
 
 void UXsDot::ConnectDevices(const FOnDeviceConnectionResult& onDeviceConnectionResult)
@@ -85,15 +95,15 @@ void UXsDot::ConnectDevices(const FOnDeviceConnectionResult& onDeviceConnectionR
 			delete deviceConnector;
 			--ThreadCounter;
 
-			AsyncTask(ENamedThreads::GameThread, [&]()
+			AsyncTask(ENamedThreads::GameThread, [&, __deviceAddress = _deviceAddress]()
+			{
+				if (!bIsGameEnd)
 				{
-					if (!bIsGameEnd)
-					{
-						OnDeviceConnectionResult.Execute(_deviceAddress, result);
-						XsDotQuats.Add(_deviceAddress, FQuat::Identity);
-					}
+					OnDeviceConnectionResult.Execute(__deviceAddress, result);
+					XsDotQuats.Add(__deviceAddress, FQuat::Identity);
+				}
 
-				});
+			});
 		});
 	}
 }
@@ -119,18 +129,24 @@ void UXsDot::ConnectDevice(const FString deviceAddress, const FOnDeviceConnectio
 		delete deviceConnector;
 		--ThreadCounter;
 
-		AsyncTask(ENamedThreads::GameThread, [&, __deviceAddress = _deviceAddress]()
+		AsyncTask(ENamedThreads::GameThread, [&, __deviceAddress = _deviceAddress, _result = result]()
 		{
-			OnDeviceConnectionResult.Execute(__deviceAddress, result);
-			if (result)
+			if (!bIsGameEnd)
 			{
+				OnDeviceConnectionResult.Execute(__deviceAddress, _result);
 				XsDotQuats.Add(__deviceAddress, FQuat::Identity);
 			}
+
 		});
 	});
 
 	
-	deviceNotFound = true;
+	//deviceNotFound = true;
+}
+
+void UXsDot::StartMeasurement(const FString deviceAddress, bool& isSuccess)
+{
+	isSuccess = XsDotHelper->StartMeasurement(deviceAddress);
 }
 
 #pragma endregion UFUNCTIONs
@@ -204,20 +220,20 @@ void UXsDot::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponent
 			return;
 		}
 
-		auto* bindingInfo = XsDotRotationBindedSceneComps.Find(xsDotQuat.Key);
-		if(bindingInfo == nullptr)
+		auto bindingComp = XsDotBindingComps.Find(xsDotQuat.Key);
+		if(bindingComp == nullptr)
 		{
 			continue;
 		}
-		else
+		else if((*bindingComp)->GetBindingEnabled())
 		{
-			if (bindingInfo->bIsLocal)
+			if ((*bindingComp)->GetIsLocal())
 			{
-				bindingInfo->SceneComp->SetRelativeRotation(xsDotQuat.Value);
+				(*bindingComp)->SceneComponent->SetRelativeRotation(xsDotQuat.Value);
 			}
 			else
 			{
-				bindingInfo->SceneComp->SetWorldRotation(xsDotQuat.Value);
+				(*bindingComp)->SceneComponent->SetWorldRotation(xsDotQuat.Value);
 			}
 		}
 	}
@@ -242,7 +258,10 @@ void UXsDot::onButtonClicked(XsDotDevice* device, uint32_t timestamp)
 	{
 		AsyncTask(ENamedThreads::GameThread, [=]()
 		{
-			OnButtonClicked.Broadcast(XDSTR_TO_UESTR(device->bluetoothAddress()),static_cast<int>(timestamp));
+			if (!bIsGameEnd)
+			{
+				OnButtonClicked.Broadcast(XDSTR_TO_UESTR(device->bluetoothAddress()), static_cast<int>(timestamp));
+			}
 		});
 }
 }
@@ -256,4 +275,13 @@ void UXsDot::OnError(const XsResultValue result, const FString error)
 void FAsyncConnectDevices::DoWork()
 {
 	Result = XsDotHelper.ConnectDot(DeviceAddress);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void UXsBindingComponent::Init(USceneComponent* comp, bool isLocal = false, bool isEnabled = true)
+{
+	SceneComponent = comp;
+	bIsLocal = isLocal;
+	bIsEnabled = isEnabled;
 }

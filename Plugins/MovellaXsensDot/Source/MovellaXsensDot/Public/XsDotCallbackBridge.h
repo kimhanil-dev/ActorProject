@@ -88,8 +88,15 @@ public:
 	//todo : connection에 실패했을 경우에 어떻게 알릴 것인지?
 	bool ConnectAllDots();
 
+	bool StartMeasurement(const FString& deviceBluetoothAddress);
+	bool StartMeasurement(XsDotDevice* device);
+	void StartMeasurement();
+	void StopMeasurement();
+
+	TArray<XsDeviceState> GetDeviceStates();
+
 	XsPortInfoArray GetDetectedDevices();
-	TArray<const XsDotDevice*> GetConnectedDevices();
+	TArray<XsDotDevice*> GetConnectedDevices();
 
 
 	// !!! 주의 !!!
@@ -106,11 +113,11 @@ public:
 protected:
 	
 	XsDotConnectionManager* mConnectionManager;
+	
 	XsPortInfoArray DetectedDevices;
-	TArray<XsDotDevice*> mConnectedDevices;
-	TArray<XsDotUsbDevice*> mConnectedUsbDevices;
-	TArray<IXsDotCallBackListener*> mListeners;
+	TMap<FString, XsDotDevice*> mConnectedDevices;
 	std::map<FString,std::list<XsDataPacket>> mPackets;
+	TArray<IXsDotCallBackListener*> mListeners;
 	mutable xsens::Mutex mMutex;
 
 

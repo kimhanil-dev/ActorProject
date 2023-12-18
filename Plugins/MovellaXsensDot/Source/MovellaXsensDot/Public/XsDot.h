@@ -11,6 +11,53 @@
 
 #include "XsDot.generated.h"
 
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
+class MOVELLAXSENSDOT_API UXsBindingComponent : public UActorComponent
+{
+public:
+	GENERATED_BODY()
+
+
+
+	UPROPERTY(BlueprintReadWrite, Category = "Xsens Dot")
+	USceneComponent* SceneComponent;
+
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	void Init(USceneComponent* comp, bool isLocal, bool isEnabled);
+
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	void SetBindingEnabled(bool bEnabled)
+	{
+		bIsEnabled = bEnabled;
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	bool GetBindingEnabled() const
+	{
+		return bIsEnabled;
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	void SetIsLocal(bool bLocal)
+	{
+		bIsLocal = bLocal;
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	bool GetIsLocal() const
+	{
+		return bIsLocal;
+	}
+
+	/**  */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Xsens Dot")
+	void OnRotationUpdated();
+
+protected:
+	bool bIsEnabled = false;
+	bool bIsLocal;
+};
+
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class MOVELLAXSENSDOT_API UXsDot : public UActorComponent, public IXsDotCallBackListener
 {
@@ -52,6 +99,9 @@ public:
 	void ConnectDevice(const FString deviceAddress, const FOnDeviceConnectionResult& onDeviceConnectionResult, bool& deviceNotFound);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	void StartMeasurement(const FString deviceAddress, bool& isSuccess);
+
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void StartScanning(const FOnDeviceDetected& onDeviceDetected);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
@@ -68,7 +118,7 @@ public:
 	static FRotator XsDotRotatorToUERotator(const FRotator xsRotator);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot", meta = (ToolTip = "false if device address not found"))
-	bool BindRotationToXsDotDevice(USceneComponent* sceneComp, const FString& deviceAddress, const bool bIsLocal);
+	bool BindToXsDot(const FString deviceAddress, UXsBindingComponent* target);
 
 protected:
 	// Called when the game starts
@@ -81,12 +131,7 @@ public:
 private:
 	XsDotCallbackBridge* XsDotHelper = nullptr;
 	TMap<FString, FQuat> XsDotQuats;
-	struct FBindedSceneCompInfo
-	{
-		USceneComponent* SceneComp;
-		bool bIsLocal;
-	};
-	TMap<FString, FBindedSceneCompInfo> XsDotRotationBindedSceneComps;
+	TMap<FString, UXsBindingComponent*> XsDotBindingComps;
 
 	// for check runnging thread
 	unsigned int ThreadCounter;
