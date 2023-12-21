@@ -9,9 +9,12 @@
 
 #include "Misc/MessageDialog.h"
 
+#include "GeometryCollection/GeometryCollectionComponent.h"
+
 // Sets default values for this component's properties
 UXsDot::UXsDot()
 {
+	UGeometryCollectionComponent component;
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
@@ -39,6 +42,11 @@ void UXsDot::ResetOrientation()
 	XsDotHelper->ResetOrientation();
 }
 
+void UXsDot::AddBindingManager(UXsBindingManager* bindingManager)
+{
+	XsBindingManagers.Push(bindingManager);
+}
+
 FVector UXsDot::XsDotVectorToUEVector(const FVector xsVector)
 {
 	FVector ueVector;
@@ -52,22 +60,6 @@ FVector UXsDot::XsDotVectorToUEVector(const FVector xsVector)
 FRotator UXsDot::XsDotRotatorToUERotator(const FRotator xsRotator)
 {
 	return FRotator(xsRotator.Roll, -xsRotator.Yaw , xsRotator.Pitch);
-}
-
-bool UXsDot::BindToXsDot(const FString deviceAddress, UXsBindingComponent* target)
-{
-	for (const auto& device : XsDotHelper->GetDetectedDevices())
-	{
-		if(XDSTR_TO_UESTR(device.bluetoothAddress()).Equals(deviceAddress))
-		{
-			XsDotBindingComps.Add(deviceAddress, target);
-			return true;
-		}
-	}
-
-	XDLOG(Error, TEXT("Device with address %s not found"), *deviceAddress);
-
-	return false;
 }
 
 void UXsDot::ConnectDevices(const FOnDeviceConnectionResult& onDeviceConnectionResult)
@@ -152,7 +144,7 @@ void UXsDot::StartMeasurement(const FString deviceAddress, bool& isSuccess)
 #pragma endregion UFUNCTIONs
 
 
-void UXsDot::GetDetectedDeviceName(TArray<FXsPortInfo>& devices)
+void UXsDot::GetDetectedDeviceName(TArray<FXsPortInfo>& devices) const
 {
 	for (const XsPortInfo& device : XsDotHelper->GetDetectedDevices())
 	{
@@ -194,7 +186,7 @@ void UXsDot::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	// wait for thread complite
 	FMessageDialog::Open(EAppMsgType::Type::Ok, FText::FromString(FString::Printf(TEXT("Waiting for thread safe cleanup..."))));
 	bIsGameEnd = true;
-	while(ThreadCounter > 0)
+	while (ThreadCounter > 0)
 	{
 		FPlatformProcess::Sleep(0.1f);
 	}
@@ -213,28 +205,16 @@ void UXsDot::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponent
 	// ...
 
 	//Update binded scene components rotation
-	for (auto& xsDotQuat : XsDotQuats)
+	for (auto[key, value] : XsDotQuats)
 	{
-		if (!XsDotHelper->GetQuaternionData(xsDotQuat.Key, xsDotQuat.Value))
+		if (!XsDotHelper->GetQuaternionData(key, value))
 		{
 			return;
 		}
 
-		auto bindingComp = XsDotBindingComps.Find(xsDotQuat.Key);
-		if(bindingComp == nullptr)
+		for (auto& bindingManager : XsBindingManagers)
 		{
-			continue;
-		}
-		else if((*bindingComp)->GetBindingEnabled())
-		{
-			if ((*bindingComp)->GetIsLocal())
-			{
-				(*bindingComp)->SceneComponent->SetRelativeRotation(xsDotQuat.Value);
-			}
-			else
-			{
-				(*bindingComp)->SceneComponent->SetWorldRotation(xsDotQuat.Value);
-			}
+			bindingManager->Update(key, value);
 		}
 	}
 }
@@ -247,9 +227,9 @@ void UXsDot::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponent
 void UXsDot::OnAdvertisementFound(const FXsPortInfo& portInfo)
 {
 	AsyncTask(ENamedThreads::GameThread, [=]()
-	{
-		OnDeviceDetected.Execute(portInfo.BluetoothAddress);
-	});
+		{
+			OnDeviceDetected.Execute(portInfo.BluetoothAddress);
+		});
 }
 
 void UXsDot::onButtonClicked(XsDotDevice* device, uint32_t timestamp)
@@ -257,13 +237,13 @@ void UXsDot::onButtonClicked(XsDotDevice* device, uint32_t timestamp)
 	if (device != nullptr)
 	{
 		AsyncTask(ENamedThreads::GameThread, [=]()
-		{
-			if (!bIsGameEnd)
 			{
-				OnButtonClicked.Broadcast(XDSTR_TO_UESTR(device->bluetoothAddress()), static_cast<int>(timestamp));
-			}
-		});
-}
+				if (!bIsGameEnd)
+				{
+					OnButtonClicked.Broadcast(XDSTR_TO_UESTR(device->bluetoothAddress()), static_cast<int>(timestamp));
+				}
+			});
+	}
 }
 
 void UXsDot::OnError(const XsResultValue result, const FString error)
@@ -278,10 +258,83 @@ void FAsyncConnectDevices::DoWork()
 }
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-void UXsBindingComponent::Init(USceneComponent* comp, bool isLocal = false, bool isEnabled = true)
+bool UXsBindingManager::Bind(FString tag, const FXsBindingInfo& bindingInfo, const bool isAnonymous)
 {
-	SceneComponent = comp;
-	bIsLocal = isLocal;
-	bIsEnabled = isEnabled;
+	const FString& bluetoothdAddress = bindingInfo.TargetXsDeviceBluetoothAddress;
+
+	if (!isAnonymous)
+	{
+		BindingInfos.Add(tag, bindingInfo);
+	}
+
+	if (BindingInfosDeviceAddressBased.Contains(bluetoothdAddress))
+	{
+		BindingInfosDeviceAddressBased[bluetoothdAddress].Push(bindingInfo);
+	}
+	else
+	{
+		BindingInfosDeviceAddressBased.Add(bluetoothdAddress).Push(bindingInfo);
+	}
+
+	return true;
+}
+
+bool UXsBindingManager::SetEnable(FString tag,bool isEnable)
+{
+	FXsBindingInfo* bindingInfo = GetBindingInfo(tag);
+	if (bindingInfo != nullptr)
+	{
+		bindingInfo->bIsEnabled = true;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+bool UXsBindingManager::SetLocal(FString tag, bool isLocal)
+{
+	FXsBindingInfo* bindingInfo = GetBindingInfo(tag);
+	if (bindingInfo != nullptr)
+	{
+		bindingInfo->bIsLocal = true;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+void UXsBindingManager::Update(const FString& deviceBluetoothAddress, const FQuat& rotation)
+{
+	if (BindingInfosDeviceAddressBased.Contains(deviceBluetoothAddress))
+	{
+		auto& target = BindingInfosDeviceAddressBased[deviceBluetoothAddress];
+		for (auto& bindingInfo : target)
+		{
+			if (bindingInfo.bIsEnabled)
+			{
+				if (bindingInfo.bIsLocal)
+				{
+					bindingInfo.SceneComponent->SetRelativeRotation(rotation);
+				}
+				else
+				{
+					bindingInfo.SceneComponent->SetWorldRotation(rotation);
+				}
+			}
+		}
+	}
+}
+
+FXsBindingInfo* UXsBindingManager::GetBindingInfo(const FString& tag)
+{
+	if (!BindingInfos.Contains(tag))
+	{
+		return nullptr;
+	}
+
+	return &BindingInfos[tag];
 }

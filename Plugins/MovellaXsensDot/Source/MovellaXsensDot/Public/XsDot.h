@@ -11,51 +11,51 @@
 
 #include "XsDot.generated.h"
 
-UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
-class MOVELLAXSENSDOT_API UXsBindingComponent : public UActorComponent
+
+USTRUCT(BlueprintType)
+struct MOVELLAXSENSDOT_API FXsBindingInfo
 {
-public:
 	GENERATED_BODY()
-
-
 
 	UPROPERTY(BlueprintReadWrite, Category = "Xsens Dot")
 	USceneComponent* SceneComponent;
 
-	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	void Init(USceneComponent* comp, bool isLocal, bool isEnabled);
+	UPROPERTY(BlueprintReadWrite, Category = "Xsens Dot")
+	FString TargetXsDeviceBluetoothAddress;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Xsens Dot")
+	bool bIsEnabled = false;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Xsens Dot")
+	bool bIsLocal;
+};
+
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
+class MOVELLAXSENSDOT_API UXsBindingManager : public UActorComponent
+{
+public:
+	GENERATED_BODY()
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	void SetBindingEnabled(bool bEnabled)
-	{
-		bIsEnabled = bEnabled;
-	}
+	bool Bind(FString tag, const FXsBindingInfo& bindingInfo, const bool isAnonymous);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	bool GetBindingEnabled() const
-	{
-		return bIsEnabled;
-	}
+	bool SetEnable(FString tag, bool isEnable);
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	void SetIsLocal(bool bLocal)
-	{
-		bIsLocal = bLocal;
-	}
+	bool SetLocal(FString tag, bool isLocal);
 
-	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	bool GetIsLocal() const
-	{
-		return bIsLocal;
-	}
+	void Update(const FString& deviceBluetoothAddress, const FQuat& rotation);
 
-	/**  */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Xsens Dot")
 	void OnRotationUpdated();
 
-protected:
-	bool bIsEnabled = false;
-	bool bIsLocal;
+private:
+	TMap<FString, FXsBindingInfo> BindingInfos;
+	TMap<FString, TArray<FXsBindingInfo>> BindingInfosDeviceAddressBased;
+
+	/** if 'BindingInfo' not found return false */
+	FXsBindingInfo* GetBindingInfo(const FString& tag);
 };
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -81,7 +81,7 @@ public:
 	//DECLARE_DELEGATE_
 
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
-	void GetDetectedDeviceName(TArray<FXsPortInfo>& devices);
+	void GetDetectedDeviceName(TArray<FXsPortInfo>& devices) const;
 
 	/*UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void GetLiveData(const FString& deviceBluetoothAddress, FRotator& rotation, FVector& acceleration, FQuat& quat, bool& valid);*/
@@ -111,14 +111,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
 	void ResetOrientation();
 
+	UFUNCTION(BlueprintCallable, Category = "Xsens Dot")
+	void AddBindingManager(UXsBindingManager* bindingManager);
+
 	/** return XsDot coordinate system vector to unreal engine coordinate system vector */
 	UFUNCTION(BlueprintPure, Category = "Xsens Dot | Utill")
 	static FVector XsDotVectorToUEVector(const FVector xsVector);
 	UFUNCTION(BlueprintPure, Category = "Xsens Dot | Utill")
 	static FRotator XsDotRotatorToUERotator(const FRotator xsRotator);
-
-	UFUNCTION(BlueprintCallable, Category = "Xsens Dot", meta = (ToolTip = "false if device address not found"))
-	bool BindToXsDot(const FString deviceAddress, UXsBindingComponent* target);
 
 protected:
 	// Called when the game starts
@@ -128,10 +128,13 @@ protected:
 public:	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	TArray< UXsBindingManager*> XsBindingManagers;
+
 private:
 	XsDotCallbackBridge* XsDotHelper = nullptr;
 	TMap<FString, FQuat> XsDotQuats;
-	TMap<FString, UXsBindingComponent*> XsDotBindingComps;
 
 	// for check runnging thread
 	unsigned int ThreadCounter;
