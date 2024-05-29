@@ -10,4 +10,5 @@
   - 'Movella'의 Xsesn Dot과 Xsens Dot SDK를 활용한 실시간 모션 캡처 기능
   - 연극에서 사용하기 위한 씬 전환 기능
 
-
+# 모션 캡쳐 시연
+[https://youtube.com/clip/UgkxFd9V79T1o_Tzfu7Kf1bAr_mNPyLHfCjq?si=C5mSBw47Qv_Vrsa-](https://youtube.com/clip/UgkxFd9V79T1o_Tzfu7Kf1bAr_mNPyLHfCjq?si=C5mSBw47Qv_Vrsa-)
